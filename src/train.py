@@ -1,6 +1,8 @@
 import os
 import torch
+import gc
 import logging
+import shutil
 from datasets import load_dataset
 from unsloth import FastLanguageModel
 from unsloth.chat_templates import get_chat_template
@@ -83,14 +85,22 @@ def main():
             lr_scheduler_type = "cosine",
             seed = 3407,
             output_dir = "outputs",
-            report_to = "none", # Set to "wandb" if Kaggle env has WANDB_API_KEY
+            report_to = "none",
+            save_strategy = "no", # CRITICAL FOR KAGGLE SPACE: Disable intermediate checkpoint saves
         ),
     )
 
     trainer.train()
+    
+    logging.info("Training complete. Freeing memory before GGUF export...")
+    # Clear memory and delete outputs directory to save Kaggle disk space
+    del trainer
+    gc.collect()
+    torch.cuda.empty_cache()
+    if os.path.exists("outputs"):
+        shutil.rmtree("outputs")
 
     logging.info("Exporting fine-tuned model to GGUF format (Q4_K_M)...")
-    # Export locally or on Kaggle output dir
     out_name = "provably-aligned-gemma-q4_k_m"
     model.save_pretrained_gguf(out_name, tokenizer, quantization_method="q4_k_m")
     
