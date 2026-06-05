@@ -1,0 +1,39 @@
+name: Kaggle Continuous Training (CT)
+
+on:
+  workflow_run:
+    workflows: ["Dataset Quality Assurance"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  trigger_kaggle:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Kaggle API
+        run: pip install kaggle
+
+      - name: Configure Kaggle Credentials
+        run: |
+          mkdir -p ~/.kaggle
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\",\"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+
+      - name: Inject Kaggle Username into Metadata
+        run: |
+          sed -i "s/KAGGLE_USERNAME/${{ secrets.KAGGLE_USERNAME }}/g" kaggle/kernel-metadata.json
+
+      - name: Push and Execute Notebook on Kaggle
+        run: |
+          cd kaggle
+          kaggle kernels push
