@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -31,7 +31,16 @@ jobs:
 
       - name: Inject Kaggle Username into Metadata
         run: |
-          sed -i "s/KAGGLE_USERNAME/${{ secrets.KAGGLE_USERNAME }}/g" kaggle/kernel-metadata.json
+          # Convert username to lowercase (Kaggle requirement)
+          USERNAME=$(echo "${{ secrets.KAGGLE_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+          
+          # Check if secret is actually populated
+          if [ -z "$USERNAME" ]; then
+            echo "::error::KAGGLE_USERNAME secret is empty! Please ensure it is saved as a Repository Secret."
+            exit 1
+          fi
+          
+          sed -i "s/KAGGLE_USERNAME/$USERNAME/g" kaggle/kernel-metadata.json
 
       - name: Push and Execute Notebook on Kaggle
         run: |
